@@ -1,0 +1,4 @@
+minio
+spark
+*.log
+metastore_db
