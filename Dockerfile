@@ -3,12 +3,12 @@ FROM openjdk:8u242-jre
 WORKDIR /opt
 
 ENV HADOOP_VERSION=3.2.0
-ENV METASTORE_VERSION=3.0.0
+ENV METASTORE_VERSION=3.1.3
 
 ENV HADOOP_HOME=/opt/hadoop-${HADOOP_VERSION}
 ENV HIVE_HOME=/opt/apache-hive-metastore-${METASTORE_VERSION}-bin
 
-RUN curl -L https://downloads.apache.org/hive/hive-standalone-metastore-${METASTORE_VERSION}/hive-standalone-metastore-${METASTORE_VERSION}-bin.tar.gz | tar zxf - && \
+RUN curl -L https://repo1.maven.org/maven2/org/apache/hive/hive-standalone-metastore/${METASTORE_VERSION}/hive-standalone-metastore-${METASTORE_VERSION}-bin.tar.gz | tar zxf - && \
     curl -L https://archive.apache.org/dist/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}.tar.gz | tar zxf - && \
     wget https://jdbc.postgresql.org/download/postgresql-42.2.24.jar --no-check-certificate && \
     cp postgresql-42.2.24.jar ${HIVE_HOME}/lib/ && \

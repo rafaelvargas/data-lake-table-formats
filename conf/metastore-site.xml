@@ -6,7 +6,7 @@
     </property>
     <property>
         <name>metastore.task.threads.always</name>
-        <value>org.apache.hadoop.hive.metastore.events.EventCleanerTask,org.apache.hadoop.hive.metastore.MaterializationsCacheCleanerTask</value>
+        <value>org.apache.hadoop.hive.metastore.events.EventCleanerTask</value>
     </property>
     <property>
         <name>metastore.expression.proxy</name>
@@ -18,7 +18,7 @@
     </property>
     <property>
         <name>javax.jdo.option.ConnectionURL</name>
-        <value>jdbc:postgresql://metastore-db:5432/metastore_db</value>
+        <value>jdbc:postgresql://postgres:5432/metastore_db</value>
     </property>
     <property>
         <name>javax.jdo.option.ConnectionUserName</name>
@@ -31,7 +31,7 @@
 
 	<property>
         <name>metastore.warehouse.dir</name>
-        <value>s3a://dremio/</value>
+        <value>s3a://hudi/</value>
     </property>
     <property>
 		<name>fs.s3a.access.key</name>
