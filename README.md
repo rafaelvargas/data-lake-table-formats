@@ -18,17 +18,19 @@ pip install -r requirements.txt
 
 ```sql
 -- create external partitioned table
-CREATE TABLE iceberg_external_table (
-  id bigint,
-  data string,
-  category string
-)
-USING iceberg
-PARTITIONED BY (category)
-location 's3a://iceberg/iceberg_external_table';
+CREATE TABLE IF NOT EXISTS delta_external_table (
+  id INT,
+  data STRING,
+  category STRING
+) USING DELTA
+location 's3a://delta/delta_external_table';
 
-INSERT INTO iceberg_external_table VALUES (1, 'a', 'c1'), (2, 'b', 'c1'), (3, 'c', 'c2');
+INSERT INTO delta_external_table VALUES (1, 'a', 'c1'), (2, 'b', 'c1'), (3, 'c', 'c2');
 ```
+
+### Compatibility
+
+https://docs.delta.io/latest/releases.html#compatibility-with-apache-spark
 
 
 ## Iceberg
