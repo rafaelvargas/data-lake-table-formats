@@ -3,6 +3,12 @@
 
 Benchmark of Data Lake File Formats
 
+## Setting up the cluster
+
+```bash
+wget https://dlcdn.apache.org/spark/spark-3.1.3/spark-3.1.3-bin-hadoop3.2.tgz
+```
+
 
 ## Setting up the local environment
 
@@ -15,6 +21,10 @@ pip install -r requirements.txt
 ```
 
 ## Delta
+
+```bash
+spark-sql --properties-file delta.conf
+```
 
 ```sql
 -- create external partitioned table
@@ -35,6 +45,10 @@ https://docs.delta.io/latest/releases.html#compatibility-with-apache-spark
 
 ## Iceberg
 
+```bash
+spark-sql --properties-file iceberg.conf
+```
+
 ```sql
 -- create external partitioned table
 CREATE TABLE iceberg_external_table (
@@ -51,6 +65,10 @@ INSERT INTO iceberg_external_table VALUES (1, 'a', 'c1'), (2, 'b', 'c1'), (3, 'c
 
 
 ## Hudi
+
+```bash
+spark-sql --properties-file hudi.conf
+```
 
 ### Copy on Write Tables
 
