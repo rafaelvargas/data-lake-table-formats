@@ -6,7 +6,10 @@ Benchmark of Data Lake File Formats
 ## Setting up the cluster
 
 ```bash
+mkdir spark
+cd spark
 wget https://dlcdn.apache.org/spark/spark-3.1.3/spark-3.1.3-bin-hadoop3.2.tgz
+tar -zvxf spark-3.1.3-bin-hadoop3.2.tgz
 ```
 
 
