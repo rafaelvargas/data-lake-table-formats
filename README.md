@@ -17,6 +17,7 @@ wget https://dlcdn.apache.org/spark/spark-3.1.3/spark-3.1.3-bin-hadoop3.2.tgz
 ```
 pyenv install 3.9.11
 pyenv virtualenv 3.9.11 data-lake-file-formats
+pyenv activate data-lake-file-formats
 pip install -r requirements.txt
 ```
 
@@ -32,8 +33,7 @@ CREATE TABLE IF NOT EXISTS delta_external_table (
   id INT,
   data STRING,
   category STRING
-) USING DELTA
-location 's3a://delta/delta_external_table';
+) USING DELTA;
 
 INSERT INTO delta_external_table VALUES (1, 'a', 'c1'), (2, 'b', 'c1'), (3, 'c', 'c2');
 ```
@@ -57,8 +57,7 @@ CREATE TABLE iceberg_external_table (
   category string
 )
 USING iceberg
-PARTITIONED BY (category)
-location 's3a://iceberg/iceberg_external_table';
+PARTITIONED BY (category);
 
 INSERT INTO iceberg_external_table VALUES (1, 'a', 'c1'), (2, 'b', 'c1'), (3, 'c', 'c2');
 ```
@@ -84,7 +83,6 @@ options (
   type = 'cow',
   primaryKey = 'id'
 )
-location 's3a://hudi/hudi_external_cow_table';
 
 insert into hudi_external_cow_table select 1 as id, 'test' as name, 20.0 as price;
 
@@ -99,9 +97,23 @@ options (
   primaryKey = 'id'
 ) 
 partitioned by (dt)
-location 's3a://hudi/hudi_external_partitioned_cow_table';
 
 insert into hudi_external_partitioned_cow_table select 1 as id, 'test' as name, 1000 as ts;
 ```
 
+### Merge on Read Tables 
 
+```sql
+-- create an external mor table
+create table if not exists hudi_external_mor_table (
+  id int, 
+  name string, 
+  price double
+) using hudi
+options (
+  type = 'mor',
+  primaryKey = 'id'
+);
+
+insert into hudi_external_mor_table select 1 as id, 'test' as name, 20.0 as price;
+```
