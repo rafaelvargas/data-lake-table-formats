@@ -2,6 +2,7 @@ minio
 spark
 *.log
 metastore_db
+scripts/data_generation/data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
