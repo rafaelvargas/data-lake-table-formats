@@ -1,14 +1,15 @@
 
 import argparse
 
-from experiments import IcebergExperiment
+from experiments import DeltaExperiment, IcebergExperiment
 
 
 def run_experiments(table_format: str):
     experiments = {
-        'iceberg':  IcebergExperiment()
+        'iceberg':  IcebergExperiment,
+        'delta': DeltaExperiment
     }
-    experiments[table_format].run()
+    experiments[table_format]().run()
 
 def parse_command_line_arguments():
     parser = argparse.ArgumentParser(
