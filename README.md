@@ -24,6 +24,15 @@ pyenv activate data-lake-file-formats
 pip install -r requirements.txt
 ```
 
+```bash
+export PYSPARK_PYTHON=/path/to/python/binary/executable
+export PYSPARK_DRIVER_PYTHON=/path/to/python/binary/executable
+
+export PYSPARK_PYTHON=~/.pyenv/versions/3.9.11/bin/python3
+export PYSPARK_DRIVER_PYTHON=~/.pyenv/versions/3.9.11/bin/python3
+export SPARK_HOME=~/.pyenv/versions/data-lake-file-formats/lib/python3.9/site-packages/pyspark
+```
+
 ## Delta
 
 ```bash
@@ -85,7 +94,7 @@ create table if not exists hudi_external_cow_table (
 options (
   type = 'cow',
   primaryKey = 'id'
-)
+);
 
 insert into hudi_external_cow_table select 1 as id, 'test' as name, 20.0 as price;
 
@@ -99,7 +108,7 @@ options (
   type = 'cow',
   primaryKey = 'id'
 ) 
-partitioned by (dt)
+partitioned by (dt);
 
 insert into hudi_external_partitioned_cow_table select 1 as id, 'test' as name, 1000 as ts;
 ```
