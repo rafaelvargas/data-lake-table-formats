@@ -1,13 +1,14 @@
 
 import argparse
 
-from experiments import DeltaExperiment, IcebergExperiment
+from experiments import DeltaExperiment, HudiExperiment, IcebergExperiment
 
 
 def run_experiments(table_format: str):
     experiments = {
-        'iceberg':  IcebergExperiment,
-        'delta': DeltaExperiment
+        'iceberg': IcebergExperiment,
+        'delta': DeltaExperiment,
+        'hudi': HudiExperiment,
     }
     experiments[table_format]().run()
 

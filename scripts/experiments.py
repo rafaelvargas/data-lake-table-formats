@@ -17,30 +17,45 @@ class Experiment:
             conf.set(c[0], c[1])
         spark = SparkSession\
             .builder\
-            .appName(f"{self._table_format}Experiment")\
+            .appName(f"{self._table_format}_experiment")\
             .config(conf=conf)\
             .enableHiveSupport()\
             .getOrCreate()
         return spark
     
     def _load_data(self, table: str):
-        column_definitions_string = ""
-        column_definitions = tables.DEFINITIONS[table]['column_definitions']
         partition_columns = tables.DEFINITIONS[table]['partition_columns']
-        for column_name in column_definitions.keys():
-            column_definitions_string += column_name + f" {column_definitions[column_name]}" + '\n' + "\t\t"
+        primary_key = tables.DEFINITIONS[table]['primary_key'] 
+
+        partition_string = f"PARTITIONED BY ({partition_columns})" if partition_columns else ""
+        options_string = {
+            "hudi": """
+                OPTIONS (
+                    type = 'cow', 
+                    primaryKey = '{primary_key}'
+                )
+            """,
+            "iceberg": """
+                TBLPROPERTIES (
+                    'write.format.default' = 'parquet',
+                    'write.parquet.compression-codec' = 'snappy',
+                    'write.merge.mode' = 'copy-on-write',
+                    'write.spark.fanout.enabled'= true
+                )
+            """,
+            "delta": ""
+        }    
+            
         self._spark_session.sql(f"DROP TABLE IF EXISTS {self._table_format}_{table};")
         self._spark_session.sql(
             f"""
-            CREATE TABLE {self._table_format}_{table} (
-                {column_definitions_string}
-            )
+            CREATE TABLE {self._table_format}_{table} 
             USING {self._table_format}
-            { f"PARTITIONED BY ({partition_columns})" if partition_columns else "" };
+            { partition_string }
+            { options_string[self._table_format] }
+            LOCATION 's3a://{self._table_format}/{self._table_format}_{table}/'
+            SELECT * FROM `parquet`.`s3a://datasets/load_{table}.snappy.parquet`;
             """
-        )
-        self._spark_session.sql(
-            f"INSERT INTO {self._table_format}_{table} SELECT * FROM parquet.`s3a://datasets/load_{table}.snappy.parquet`"
         )
 
     def _update_data(self, table: str, percentage_to_update: int = 8):
@@ -146,6 +161,31 @@ class DeltaExperiment(Experiment):
         ]
         super().__init__(table_format='delta', confs=confs)
 
+class HudiExperiment(Experiment):
+    def __init__(
+        self, 
+        hudi_version: str = '0.11.1', 
+        scala_version: str = '2.12',
+        scale_in_gb=1
+    ):
+        self._scale_in_gb = scale_in_gb
+        dependencies = f"org.apache.hudi:hudi-spark3.2-bundle_{scala_version}:{hudi_version}"
+        dependencies += AWS_JARS
+        confs = [
+            ("spark.jars.packages", dependencies),
+            ('spark.hadoop.fs.s3a.access.key', 'minioadmin'),
+            ('spark.hadoop.fs.s3a.secret.key', 'minioadmin'),
+            ('spark.hadoop.fs.s3a.endpoint', 'http://127.0.0.1:9000'),
+            ('spark.hadoop.fs.s3a.connection.ssl.enabled', 'false'),
+            ('spark.sql.catalog.spark_catalog.type', 'hive'),
+            ('spark.sql.catalog.spark_catalog.uri', 'thrift://localhost:9083'),
+            ('spark.sql.catalog.spark_catalog.warehouse', 's3a://hudi/'),
+            ('spark.sql.execution.pyarrow.enabled', 'true'),
+            ('spark.sql.extensions', 'org.apache.spark.sql.hudi.HoodieSparkSessionExtension'),
+            ('spark.serializer', 'org.apache.spark.serializer.KryoSerializer'),
+            ('spark.sql.warehouse.dir', 's3a://hudi/')
+        ]
+        super().__init__(table_format='hudi', confs=confs)
 
 
 

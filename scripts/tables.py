@@ -3,8 +3,8 @@
 
 DEFINITIONS = {
     'fact_daily_usage_by_user': {
+        'primary_key': 'date,user_id,plan_id,software_version_id,platform_id,country_id', 
         'partition_columns': 'date', 
-        'primary_key': 'date', 
         'column_definitions': {
             'date': 'DATE,',
             'user_id': 'INT,',
