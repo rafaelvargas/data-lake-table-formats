@@ -132,9 +132,9 @@ class IcebergExperiment(Experiment):
             ("spark.sql.catalog.spark_catalog.uri", "thrift://localhost:9083"),
             ("spark.sql.catalog.spark_catalog.warehouse", "s3a://iceberg/"),
             ("spark.sql.execution.pyarrow.enabled", "true"),
+            ("spark.sql.warehouse.dir", "s3a://iceberg/"),
             ("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"),
-            ("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog"),
-            ("spark.sql.warehouse.dir", "s3a://iceberg/")
+            ("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")
         ]
         super().__init__(table_format='iceberg', confs=confs)
 
@@ -158,9 +158,9 @@ class DeltaExperiment(Experiment):
             ('spark.sql.catalog.spark_catalog.type', 'hive'),
             ('spark.sql.catalog.spark_catalog.uri', 'thrift://localhost:9083'),
             ('spark.sql.catalog.spark_catalog.warehouse', 's3a://delta/'),
-            ('spark.sql.catalog.spark_catalog', 'org.apache.spark.sql.delta.catalog.DeltaCatalog'),
             ('spark.sql.warehouse.dir', 's3a://delta/'),
             ('spark.sql.execution.pyarrow.enabled', 'true'),
+            ('spark.sql.catalog.spark_catalog', 'org.apache.spark.sql.delta.catalog.DeltaCatalog'),
             ('spark.sql.extensions', 'io.delta.sql.DeltaSparkSessionExtension')
         ]
         super().__init__(table_format='delta', confs=confs)
@@ -185,9 +185,9 @@ class HudiExperiment(Experiment):
             ('spark.sql.catalog.spark_catalog.uri', 'thrift://localhost:9083'),
             ('spark.sql.catalog.spark_catalog.warehouse', 's3a://hudi/'),
             ('spark.sql.execution.pyarrow.enabled', 'true'),
+            ('spark.sql.warehouse.dir', 's3a://hudi/'),
             ('spark.sql.extensions', 'org.apache.spark.sql.hudi.HoodieSparkSessionExtension'),
-            ('spark.serializer', 'org.apache.spark.serializer.KryoSerializer'),
-            ('spark.sql.warehouse.dir', 's3a://hudi/')
+            ('spark.serializer', 'org.apache.spark.serializer.KryoSerializer')
         ]
         super().__init__(table_format='hudi', confs=confs)
 
