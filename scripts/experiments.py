@@ -29,10 +29,14 @@ class Experiment:
 
         partition_string = f"PARTITIONED BY ({partition_columns})" if partition_columns else ""
         options_string = {
-            "hudi": """
+            "hudi": f"""
                 OPTIONS (
                     type = 'cow', 
-                    primaryKey = '{primary_key}'
+                    primaryKey = '{primary_key}',
+                    precombineField = '',
+                    'hoodie.datasource.write.hive_style_partitioning' = 'true',
+                    'hoodie.parquet.compression.codec' = 'snappy',
+                    'hoodie.populate.meta.fields' = 'false'
                 )
             """,
             "iceberg": """
@@ -105,8 +109,8 @@ class Experiment:
         for table_name in tables.DEFINITIONS.keys():
             self._load_data(table=table_name)
         self._query_data(table='fact_daily_usage_by_user')
-        # self._update_data(table='fact_daily_usage_by_user')
-        # self._query_data(table='fact_daily_usage_by_user')
+        self._update_data(table='fact_daily_usage_by_user')
+        self._query_data(table='fact_daily_usage_by_user')
 
 class IcebergExperiment(Experiment):
     def __init__(
