@@ -62,7 +62,7 @@ class Experiment:
             """
         )
 
-    def _update_data(self, table: str, percentage_to_update: int = 8):
+    def _update_data(self, table: str = 'fact_daily_usage_by_user', percentage_to_update: int = 8):
         self._spark_session.sql(
             f"""
             MERGE INTO {self._table_format}_{table} t
@@ -80,7 +80,7 @@ class Experiment:
             """
         )
     
-    def _query_data(self, table: str):
+    def _query_data(self, table: str = 'fact_daily_usage_by_user'):
         self._spark_session.sql(f"""
             SELECT 
                 date, 
@@ -105,12 +105,17 @@ class Experiment:
             LIMIT 1;
         """).show()
 
-    def run(self):
+    def _load_tables(self):
         for table_name in tables.DEFINITIONS.keys():
             self._load_data(table=table_name)
-        self._query_data(table='fact_daily_usage_by_user')
-        self._update_data(table='fact_daily_usage_by_user')
-        self._query_data(table='fact_daily_usage_by_user')
+
+    def run(self, operation="load"):
+        operation_handlers = {
+            "load": self._load_tables,
+            "update": self._update_data,
+            "query": self._query_data
+        }
+        operation_handlers[operation]()
 
 class IcebergExperiment(Experiment):
     def __init__(
