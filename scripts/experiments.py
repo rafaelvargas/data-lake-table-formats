@@ -1,15 +1,22 @@
 
+from datetime import datetime
+
 from pyspark.sql import SparkSession
 from pyspark import SparkConf
+
 import tables
 
 AWS_JARS=',org.apache.hadoop:hadoop-aws:3.3.1,com.amazonaws:aws-java-sdk-bundle:1.12.300'
 
 class Experiment:
-    def __init__(self, table_format: str, confs: list):
+    def __init__(self, table_format: str, scale_in_gb: int, confs: list, path: str):
         self._table_format = table_format
         self._confs = confs
         self._spark_session = self._create_spark_session()
+        now = datetime.now()
+        self._database_name = f"{scale_in_gb}gb_{self._table_format}" 
+        self._experiment_id = now.strftime("%Y%m%d_%H%M%S") + "_" + self._database_name
+        self._database_path = f"{path}/databases/{self._experiment_id}"
     
     def _create_spark_session(self):
         conf = SparkConf()
@@ -26,6 +33,7 @@ class Experiment:
     def _load_data(self, table: str):
         partition_columns = tables.DEFINITIONS[table]['partition_columns']
         primary_key = tables.DEFINITIONS[table]['primary_key'] 
+        target_location =  f"{self._database_path}/{table}/"
 
         partition_string = f"PARTITIONED BY ({partition_columns})" if partition_columns else ""
         options_string = {
@@ -50,14 +58,14 @@ class Experiment:
             "delta": ""
         }    
             
-        self._spark_session.sql(f"DROP TABLE IF EXISTS {self._table_format}_{table};")
+        self._spark_session.sql(f"DROP TABLE IF EXISTS `{self._database_name}`.`{table}`;")
         self._spark_session.sql(
             f"""
-            CREATE TABLE {self._table_format}_{table} 
+            CREATE TABLE `{self._database_name}`.`{table}` 
             USING {self._table_format}
             { partition_string }
             { options_string[self._table_format] }
-            LOCATION 's3a://{self._table_format}/{self._table_format}_{table}/'
+            LOCATION '{target_location}'
             SELECT * FROM `parquet`.`s3a://datasets/load_{table}.snappy.parquet`;
             """
         )
@@ -65,7 +73,7 @@ class Experiment:
     def _update_data(self, table: str = 'fact_daily_usage_by_user', percentage_to_update: int = 8):
         self._spark_session.sql(
             f"""
-            MERGE INTO {self._table_format}_{table} t
+            MERGE INTO `{self._database_name}`.`{table}` t
             USING (SELECT * FROM parquet.`s3a://datasets/update_{percentage_to_update}_{table}.snappy.parquet`) s
                 ON t.date = s.date
                 AND t.user_id = s.user_id
@@ -88,7 +96,7 @@ class Experiment:
                 SUM(duration_in_seconds) duration_sum, 
                 SUM(number_of_logins) number_of_logins,
                 COUNT(*) number_of_rows 
-            FROM {self._table_format}_{table}
+            FROM `{self._database_name}`.`{table}`
             GROUP BY 
                 date;
         """).show()
@@ -96,8 +104,8 @@ class Experiment:
             SELECT 
                 c.name country, 
                 COUNT(DISTINCT user_id) number_of_active_users
-            FROM {self._table_format}_{table} t
-            INNER JOIN {self._table_format}_dim_country c
+            FROM `{self._database_name}`.`{table}` t
+            INNER JOIN `{self._database_name}`.`dim_country` c
                 on c.id = t.country_id
             GROUP BY 
                 c.name
@@ -106,10 +114,12 @@ class Experiment:
         """).show()
 
     def _load_tables(self):
+        self._spark_session.sql(f"DROP DATABASE IF EXISTS {self._database_name} CASCADE;")
+        self._spark_session.sql(f"CREATE DATABASE IF NOT EXISTS {self._database_name};")
         for table_name in tables.DEFINITIONS.keys():
             self._load_data(table=table_name)
 
-    def run(self, operation="load"):
+    def run(self, operation: str):
         operation_handlers = {
             "load": self._load_tables,
             "update": self._update_data,
@@ -122,7 +132,8 @@ class IcebergExperiment(Experiment):
         self, 
         iceberg_version: str = '0.14.0', 
         scala_version: str = '2.12',
-        scale_in_gb=1
+        scale_in_gb=1,
+        path: str = "s3a://experiments"
     ):
         self._scale_in_gb = scale_in_gb
         dependencies = f"org.apache.iceberg:iceberg-spark-runtime-3.2_{scala_version}:{iceberg_version}"
@@ -135,20 +146,21 @@ class IcebergExperiment(Experiment):
             ("spark.hadoop.fs.s3a.connection.ssl.enabled", "false"),
             ("spark.sql.catalog.spark_catalog.type", "hive"),
             ("spark.sql.catalog.spark_catalog.uri", "thrift://localhost:9083"),
-            ("spark.sql.catalog.spark_catalog.warehouse", "s3a://iceberg/"),
+            # ("spark.sql.catalog.spark_catalog.warehouse", "s3a://iceberg/"),
             ("spark.sql.execution.pyarrow.enabled", "true"),
-            ("spark.sql.warehouse.dir", "s3a://iceberg/"),
+            # ("spark.sql.warehouse.dir", "s3a://iceberg/"),
             ("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"),
             ("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")
         ]
-        super().__init__(table_format='iceberg', confs=confs)
+        super().__init__(table_format='iceberg', scale_in_gb=scale_in_gb, confs=confs, path=path)
 
 class DeltaExperiment(Experiment):
     def __init__(
         self, 
         delta_version: str = '2.0.0', 
         scala_version: str = '2.12',
-        scale_in_gb=1
+        scale_in_gb=1,
+        path: str = "s3a://experiments"
     ):
         self._scale_in_gb = scale_in_gb
         dependencies = f"io.delta:delta-core_{scala_version}:{delta_version},io.delta:delta-contribs_{scala_version}:{delta_version},io.delta:delta-hive_{scala_version}:0.2.0"
@@ -162,20 +174,21 @@ class DeltaExperiment(Experiment):
             ('spark.sql.catalogImplementation', 'hive'),
             ('spark.sql.catalog.spark_catalog.type', 'hive'),
             ('spark.sql.catalog.spark_catalog.uri', 'thrift://localhost:9083'),
-            ('spark.sql.catalog.spark_catalog.warehouse', 's3a://delta/'),
-            ('spark.sql.warehouse.dir', 's3a://delta/'),
+            # ('spark.sql.catalog.spark_catalog.warehouse', 's3a://delta/'),
+            # ('spark.sql.warehouse.dir', 's3a://delta/'),
             ('spark.sql.execution.pyarrow.enabled', 'true'),
             ('spark.sql.catalog.spark_catalog', 'org.apache.spark.sql.delta.catalog.DeltaCatalog'),
             ('spark.sql.extensions', 'io.delta.sql.DeltaSparkSessionExtension')
         ]
-        super().__init__(table_format='delta', confs=confs)
+        super().__init__(table_format='delta', scale_in_gb=scale_in_gb, confs=confs, path=path)
 
 class HudiExperiment(Experiment):
     def __init__(
         self, 
         hudi_version: str = '0.11.1', 
         scala_version: str = '2.12',
-        scale_in_gb=1
+        scale_in_gb=1,
+        path: str = "s3a://experiments"
     ):
         self._scale_in_gb = scale_in_gb
         dependencies = f"org.apache.hudi:hudi-spark3.2-bundle_{scala_version}:{hudi_version}"
@@ -188,13 +201,13 @@ class HudiExperiment(Experiment):
             ('spark.hadoop.fs.s3a.connection.ssl.enabled', 'false'),
             ('spark.sql.catalog.spark_catalog.type', 'hive'),
             ('spark.sql.catalog.spark_catalog.uri', 'thrift://localhost:9083'),
-            ('spark.sql.catalog.spark_catalog.warehouse', 's3a://hudi/'),
+            # ('spark.sql.catalog.spark_catalog.warehouse', 's3a://hudi/'),
             ('spark.sql.execution.pyarrow.enabled', 'true'),
-            ('spark.sql.warehouse.dir', 's3a://hudi/'),
+            # ('spark.sql.warehouse.dir', 's3a://hudi/'),
             ('spark.sql.extensions', 'org.apache.spark.sql.hudi.HoodieSparkSessionExtension'),
             ('spark.serializer', 'org.apache.spark.serializer.KryoSerializer')
         ]
-        super().__init__(table_format='hudi', confs=confs)
+        super().__init__(table_format='hudi', scale_in_gb=scale_in_gb, confs=confs, path=path)
 
 
 

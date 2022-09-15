@@ -4,13 +4,16 @@ import argparse
 from experiments import DeltaExperiment, HudiExperiment, IcebergExperiment
 
 
-def run_experiments(table_format: str, operation: str):
+def run_experiments(table_format: str, operation: str, s3_path: str):
     experiments = {
         'iceberg': IcebergExperiment,
         'delta': DeltaExperiment,
         'hudi': HudiExperiment,
     }
-    experiments[table_format]().run(operation=operation)
+    experiments[table_format](
+        scale_in_gb=1, 
+        path=s3_path
+    ).run(operation=operation)
 
 def parse_command_line_arguments():
     parser = argparse.ArgumentParser(
@@ -27,8 +30,13 @@ def parse_command_line_arguments():
         required=True,
         help="Run a specific operation of the experiments."
     )
+    parser.add_argument(        
+        "--s3-path",
+        required=True,
+        help="Define the S3 path to store data."
+    )
     return parser.parse_args()
 
 if __name__ == '__main__':
     args = parse_command_line_arguments()
-    run_experiments(table_format=args.table_format, operation=args.operation)
+    run_experiments(table_format=args.table_format, operation=args.operation, s3_path=args.s3_path)
