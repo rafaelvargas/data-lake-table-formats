@@ -6,9 +6,11 @@ from pyspark.sql import SparkSession
 from pyspark import SparkConf
 
 import tables
+import csv
 
-ENV = 'dev'
+ENV = 'prod'
 AWS_JARS=',org.apache.hadoop:hadoop-aws:3.3.1,com.amazonaws:aws-java-sdk-bundle:1.12.300'
+CSV_HEADER = ["operation", "elapsed_time_in_seconds"]
 
 
 class Experiment:
@@ -109,6 +111,7 @@ class Experiment:
         df = self._spark_session.sql(sql)
         _ = df.collect()
         end = time.time()
+        self._execution_times.append([operation, end - start])
         print(f"Execution time: {end - start} ({operation})")
     
     def _query_data(self, table: str = 'fact_daily_usage_by_user'):
@@ -141,6 +144,12 @@ class Experiment:
         self._run_sql(f"CREATE DATABASE IF NOT EXISTS {self._database_name} LOCATION '{self._database_path}';", f"create-database-{self._database_name}")
         for table_name in tables.DEFINITIONS.keys():
             self._load_data(table=table_name)
+    
+    def _dump_results_to_csv(self):
+        with open(f"{self._experiment_id}_results.csv", "w") as results_file:
+            writer = csv.writer(results_file)
+            writer.writerow(CSV_HEADER)
+            writer.writerows(self._execution_times)
 
     def run(self, operation: str):
         operation_handlers = {
@@ -149,6 +158,7 @@ class Experiment:
             "query": self._query_data
         }
         operation_handlers[operation]()
+        self._dump_results_to_csv()
 
 class IcebergExperiment(Experiment):
     def __init__(

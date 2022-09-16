@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 
 SCALA_VERSION = "2.12"
-ICEBERG_VERSION = ""
+ICEBERG_VERSION = "0.14.0"
 DELTA_VERSION = "2.0.0"
 HUDI_VERSION = "0.11.1"
 PACKAGES = {
@@ -47,55 +47,26 @@ def run_cmd(cmd, throw_on_error=True, env=None, stream_output=False, **kwargs):
 
 def run_cmd_over_ssh(cmd, host, ssh_id_file, user, **kwargs):
     full_cmd = f"""ssh -i {ssh_id_file} {user}@{host} "{cmd}" """
-    print(full_cmd)
     return run_cmd(full_cmd, **kwargs)
 
-# def wait_for_completion(cluster_hostname, ssh_id_file, benchmark_id, ssh_user, copy_report=True):
-#     completed = False
-#     succeeded = False
+def wait_and_download_results(master, ssh_id_file, experiment_id, ssh_user):
+    completed = False
 
-#     print(f"\nWaiting for completion of experiment id {benchmark_id}")
-#     while not completed:
-#         # Print the size of the output file to show progress
-#         (_, out, _) = run_cmd_over_ssh(f"stat -c '%n:   [%y]   [%s bytes]' {output_file}",
-#                                         cluster_hostname, ssh_id_file, ssh_user,
-#                                         throw_on_error=False)
-#         out = out.decode("utf-8").strip()
-#         print(out)
-#         if "No such file" in out:
-#             print(">>> Benchmark failed to start")
-#             return
+    results_file = f"{experiment_id}_results.csv"
+    out_file = f"{experiment_id}.out"
+    while not completed:
+        print(f"Waiting for completion of the experiment id {experiment_id}...")
+        (_, out, _) = run_cmd_over_ssh(f"ls {results_file}", master, ssh_id_file, ssh_user,
+                                        throw_on_error=False)
+        if results_file in out.decode("utf-8"):
+            completed = True
+        else:
+            time.sleep(60)
+    
+    run_cmd(f"rsync -zv {ssh_user}@{master}:~/{results_file} .")
+    run_cmd(f"rsync -zv {ssh_user}@{master}:~/{out_file} .")
+    print("Downloaded results file")
 
-#         # Check for the existence of the completed file
-#         (_, out, _) = run_cmd_over_ssh(f"ls {completed_file}", cluster_hostname, ssh_id_file, ssh_user,
-#                                         throw_on_error=False)
-#         if completed_file in out.decode("utf-8"):
-#             completed = True
-#         else:
-#             time.sleep(60)
-
-#     # Check the last few lines of output files to identify success
-#     (_, out, _) = run_cmd_over_ssh(f"tail {output_file}", cluster_hostname, ssh_id_file, ssh_user,
-#                                     throw_on_error=False)
-#     if "SUCCESS" in out.decode("utf-8"):
-#         succeeded = True
-#         print(">>> Benchmark completed with success\n")
-#     else:
-#         print(">>> Benchmark completed with failure\n")
-
-#     # Download reports
-#     if copy_report:
-#         Benchmark.download_file(output_file, cluster_hostname, ssh_id_file, ssh_user)
-#         if succeeded:
-#             report_files = [json_report_file, csv_report_file]
-#             for report_file in report_files:
-#                 Benchmark.download_file(report_file, cluster_hostname, ssh_id_file, ssh_user)
-#         print(">>> Downloaded reports to local directory")
-
-# def download_file(file, cluster_hostname, ssh_id_file, ssh_user):
-#     run_cmd(f"scp -C -i {ssh_id_file} " +
-#             f"{ssh_user}@{cluster_hostname}:{file} {file}",
-#             stream_output=True)
 
 def parse_command_line_arguments():
     parser = argparse.ArgumentParser(
@@ -133,21 +104,31 @@ def parse_command_line_arguments():
 
 if __name__ == "__main__":
     args = parse_command_line_arguments()
+    
     now = datetime.now()
     table_format = args.table_format
     database_name = f"{args.scale_in_gb}gb_{table_format}" 
     experiment_id = now.strftime("%Y%m%d_%H%M%S") + "_" + database_name
 
-    run_cmd(f"rsync -zv run_experiment.py tables.py experiments.py {args.user}@{args.master}:~")
+    ssh_file = "~/.ssh/id_ed25519"
+    master = args.master
+    user = args.user
+
+    run_cmd(f"rsync -zv run_experiment.py tables.py experiments.py {user}@{master}:~")
     for o in args.operation.split(","):
         run_cmd_over_ssh(f"""
-            spark-submit \\
-                --packages {PACKAGES[table_format]} \\
-                --py-files experiments.py,tables.py run_experiment.py \\
-                --table-format {args.table_format} --operation {o} \\
-                --s3-path {args.s3_path} \\
-                --scale-in-gb {args.scale_in_gb} \\
+            screen -d -m \\ 
+            bash -c \\ 
+            "spark-submit
+                --packages {PACKAGES[table_format]}
+                --py-files experiments.py,tables.py run_experiment.py 
+                --table-format {args.table_format} --operation {o} 
+                --s3-path {args.s3_path} 
+                --scale-in-gb {args.scale_in_gb} 
                 --experiment-id {experiment_id}
-        """, "35.89.28.100", "~/.ssh/id_ed25519", args.user)
+            &> {experiment_id}.out"
+        """, "35.89.28.100", ssh_file, user)
+        wait_and_download_results(master, ssh_file, experiment_id, user)
+
 
 
