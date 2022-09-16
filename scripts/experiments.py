@@ -12,7 +12,7 @@ AWS_JARS=',org.apache.hadoop:hadoop-aws:3.3.1,com.amazonaws:aws-java-sdk-bundle:
 
 
 class Experiment:
-    def __init__(self, table_format: str, scale_in_gb: int, confs: list, path: str):
+    def __init__(self, table_format: str, scale_in_gb: int, confs: list, path: str, experiment_id: str):
         self._table_format = table_format
         self._confs = confs
         if ENV == 'dev':
@@ -27,11 +27,14 @@ class Experiment:
                 ('spark.sql.execution.pyarrow.enabled', 'true')
             ]
         self._spark_session = self._create_spark_session()
-        now = datetime.now()
         self._database_name = f"{scale_in_gb}gb_{self._table_format}" 
-        self._experiment_id = now.strftime("%Y%m%d_%H%M%S") + "_" + self._database_name
+        if not experiment_id:
+            now = datetime.now()
+            experiment_id = now.strftime("%Y%m%d_%H%M%S") + "_" + self._database_name
+        self._experiment_id = experiment_id
         self._database_path = f"{path}/databases/{self._experiment_id}"
         self._path = path
+        self._execution_times = []
     
     def _create_spark_session(self):
         conf = SparkConf()
@@ -43,6 +46,7 @@ class Experiment:
             .config(conf=conf)\
             .enableHiveSupport()\
             .getOrCreate()
+        spark.sparkContext.setLogLevel("WARN")
         return spark
     
     def _load_data(self, table: str):
@@ -73,7 +77,7 @@ class Experiment:
             "delta": ""
         }    
         
-        self._run_sql(f"DROP TABLE IF EXISTS `{self._database_name}`.`{table}`;")
+        self._run_sql(f"DROP TABLE IF EXISTS `{self._database_name}`.`{table}`;", f"drop-table-{table}")
         self._run_sql(f"""
             CREATE EXTERNAL TABLE `{self._database_name}`.`{table}` 
             USING {self._table_format}
@@ -81,7 +85,7 @@ class Experiment:
             { options_string[self._table_format] }
             LOCATION '{target_location}'
             SELECT * FROM `parquet`.`{self._path}/datasets/load_{table}.snappy.parquet`;
-        """)
+        """, f"create-table-{table}")
 
     def _update_data(self, table: str = 'fact_daily_usage_by_user', percentage_to_update: int = 8):
         self._run_sql(f"""
@@ -97,14 +101,15 @@ class Experiment:
                 t.duration_in_seconds = s.duration_in_seconds,
                 t.number_of_logins = s.number_of_logins,
                 t.number_of_songs_played = s.number_of_songs_played;
-        """)
+        """, f"update-table-{table}-{percentage_to_update}")
 
-    def _run_sql(self, sql: str):
+    def _run_sql(self, sql: str, operation: str):
+        self._spark_session.sparkContext.setJobGroup(operation, operation, interruptOnCancel=True)
         start = time.time()
         df = self._spark_session.sql(sql)
         _ = df.collect()
         end = time.time()
-        print(f"Execution time: {end - start}")
+        print(f"Execution time: {end - start} ({operation})")
     
     def _query_data(self, table: str = 'fact_daily_usage_by_user'):
         self._run_sql(f"""
@@ -117,7 +122,7 @@ class Experiment:
             FROM `{self._database_name}`.`{table}`
             GROUP BY 
                 date;
-        """)
+        """, f"q1")
         self._run_sql(f"""
             SELECT 
                 c.name country, 
@@ -129,11 +134,11 @@ class Experiment:
                 c.name
             ORDER BY number_of_active_users DESC
             LIMIT 1;
-        """)
+        """, f"q2")
 
     def _load_tables(self):
-        self._run_sql(f"DROP DATABASE IF EXISTS {self._database_name} CASCADE;")
-        self._run_sql(f"CREATE DATABASE IF NOT EXISTS {self._database_name} LOCATION '{self._database_path}';")
+        self._run_sql(f"DROP DATABASE IF EXISTS {self._database_name} CASCADE;", f"drop-database-{self._database_name}")
+        self._run_sql(f"CREATE DATABASE IF NOT EXISTS {self._database_name} LOCATION '{self._database_path}';", f"create-database-{self._database_name}")
         for table_name in tables.DEFINITIONS.keys():
             self._load_data(table=table_name)
 
@@ -148,6 +153,8 @@ class Experiment:
 class IcebergExperiment(Experiment):
     def __init__(
         self, 
+        *,
+        experiment_id: str,
         iceberg_version: str = '0.14.0', 
         scala_version: str = '2.12',
         scale_in_gb=1,
@@ -161,11 +168,13 @@ class IcebergExperiment(Experiment):
             ("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"),
             ("spark.sql.catalog.spark_catalog", "org.apache.iceberg.spark.SparkSessionCatalog")
         ]
-        super().__init__(table_format='iceberg', scale_in_gb=scale_in_gb, confs=confs, path=path)
+        super().__init__(table_format='iceberg', scale_in_gb=scale_in_gb, confs=confs, path=path, experiment_id=experiment_id)
 
 class DeltaExperiment(Experiment):
     def __init__(
         self, 
+        *,
+        experiment_id: str,
         delta_version: str = '2.0.0', 
         scala_version: str = '2.12',
         scale_in_gb=1,
@@ -179,11 +188,13 @@ class DeltaExperiment(Experiment):
             ('spark.sql.catalog.spark_catalog', 'org.apache.spark.sql.delta.catalog.DeltaCatalog'),
             ('spark.sql.extensions', 'io.delta.sql.DeltaSparkSessionExtension')
         ]
-        super().__init__(table_format='delta', scale_in_gb=scale_in_gb, confs=confs, path=path)
+        super().__init__(table_format='delta', scale_in_gb=scale_in_gb, confs=confs, path=path, experiment_id=experiment_id)
 
 class HudiExperiment(Experiment):
     def __init__(
         self, 
+        *,
+        experiment_id: str,
         hudi_version: str = '0.11.1', 
         scala_version: str = '2.12',
         scale_in_gb=1,
@@ -197,7 +208,7 @@ class HudiExperiment(Experiment):
             ('spark.sql.extensions', 'org.apache.spark.sql.hudi.HoodieSparkSessionExtension'),
             ('spark.serializer', 'org.apache.spark.serializer.KryoSerializer')
         ]
-        super().__init__(table_format='hudi', scale_in_gb=scale_in_gb, confs=confs, path=path)
+        super().__init__(table_format='hudi', scale_in_gb=scale_in_gb, confs=confs, path=path, experiment_id=experiment_id)
 
 
 
