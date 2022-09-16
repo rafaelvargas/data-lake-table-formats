@@ -31,6 +31,7 @@ class Experiment:
         self._database_name = f"{scale_in_gb}gb_{self._table_format}" 
         self._experiment_id = now.strftime("%Y%m%d_%H%M%S") + "_" + self._database_name
         self._database_path = f"{path}/databases/{self._experiment_id}"
+        self._path = path
     
     def _create_spark_session(self):
         conf = SparkConf()
@@ -79,13 +80,13 @@ class Experiment:
             { partition_string }
             { options_string[self._table_format] }
             LOCATION '{target_location}'
-            SELECT * FROM `parquet`.`s3a://datasets/load_{table}.snappy.parquet`;
+            SELECT * FROM `parquet`.`{self._path}/datasets/load_{table}.snappy.parquet`;
         """)
 
     def _update_data(self, table: str = 'fact_daily_usage_by_user', percentage_to_update: int = 8):
         self._run_sql(f"""
             MERGE INTO `{self._database_name}`.`{table}` t
-            USING (SELECT * FROM parquet.`s3a://datasets/update_{percentage_to_update}_{table}.snappy.parquet`) s
+            USING (SELECT * FROM parquet.`{self._path}/datasets/update_{percentage_to_update}_{table}.snappy.parquet`) s
                 ON t.date = s.date
                 AND t.user_id = s.user_id
                 AND t.plan_id = s.plan_id
