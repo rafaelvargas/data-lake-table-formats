@@ -42,7 +42,11 @@ def generate_load_dataset(table='fact_daily_usage_by_user', destination_folder='
             df.to_parquet(f'{destination_folder}/load_{table}', compression='snappy', index=False, partition_cols=['date'], engine="pyarrow")
     else:
         df = pd.DataFrame.from_dict(datasets.tables[table])
-        df.to_parquet(f'{destination_folder}/load_{table}.parquet', compression='snappy', index=False)
+        folder = destination_folder + f"/load_{table}"
+        is_folder_existent = os.path.exists(destination_folder + f"/load_{table}")
+        if not is_folder_existent:
+            os.makedirs(folder)
+        df.to_parquet(f'{destination_folder}/load_{table}/part-00001.parquet', compression='snappy', index=False)
 
 
 def generate_update_datasets(table='fact_daily_usage_by_user', fractions_to_generate=[.08,.16,.32], destination_folder='data'):
@@ -60,7 +64,7 @@ def generate_update_datasets(table='fact_daily_usage_by_user', fractions_to_gene
 
 if __name__ == '__main__':
     print(f"Generating ~{SIZE}GB dataset...")
-    folder = f'data/{SIZE}gb'
+    folder = f'data/{SIZE}gb'.replace('.', '_')
     is_folder_existent = os.path.exists(folder)
     if not is_folder_existent:
         os.makedirs(folder)
