@@ -2,6 +2,7 @@
 from faker import Faker
 import datetime
 import random
+import numpy as np
 
 RANDOM_SEED = 42
 
@@ -15,7 +16,7 @@ END_DATE = datetime.date(2022, 8, 31)
 
 NUMBER_OF_COUNTRIES = 4
 NUMBER_OF_VERSIONS = 10
-NUMBER_OF_USERS = 100000
+NUMBER_OF_USERS = 10000
 
 tables = {
     'fact_daily_usage_by_user': {
@@ -76,6 +77,8 @@ tables = {
     'dim_user': {
         'id': [i for i in range(1, NUMBER_OF_USERS + 1)],
         'name': [fake.name() for _ in range(1, NUMBER_OF_USERS + 1)],
-        'age': [random.randint(14, 90) for _ in range(1, NUMBER_OF_USERS + 1)]
+        'age': np.random.randint(14, 90, size=NUMBER_OF_USERS)
     }
 }
+
+# np.random.randint(14, 90, size=NUMBER_OF_USERS)
