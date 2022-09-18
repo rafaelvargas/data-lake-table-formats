@@ -28,11 +28,6 @@
         <name>javax.jdo.option.ConnectionPassword</name>
         <value>admin</value>
     </property>
-
-	<property>
-        <name>metastore.warehouse.dir</name>
-        <value>s3a://hudi/</value>
-    </property>
     <property>
 		<name>fs.s3a.access.key</name>
 		<value>minioadmin</value>

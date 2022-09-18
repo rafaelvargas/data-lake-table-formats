@@ -49,11 +49,11 @@ def run_cmd_over_ssh(cmd, host, ssh_id_file, user, **kwargs):
     full_cmd = f"""ssh -i {ssh_id_file} {user}@{host} "{cmd}" """
     return run_cmd(full_cmd, **kwargs)
 
-def wait_and_download_results(master, ssh_id_file, experiment_id, ssh_user):
+def wait_and_download_results(master, ssh_id_file, experiment_id, ssh_user, operation):
     completed = False
 
-    results_file = f"{experiment_id}_results.csv"
-    out_file = f"{experiment_id}.out"
+    results_file = f"{experiment_id}_{operation}_results.csv"
+    out_file = f"{experiment_id}_{operation}.out"
     while not completed:
         print(f"Waiting for completion of the experiment id {experiment_id}...")
         (_, out, _) = run_cmd_over_ssh(f"ls {results_file}", master, ssh_id_file, ssh_user,
@@ -126,9 +126,9 @@ if __name__ == "__main__":
                 --s3-path {args.s3_path} 
                 --scale-in-gb {args.scale_in_gb} 
                 --experiment-id {experiment_id}
-            &> {experiment_id}.out"
+            &> {experiment_id}_{o}.out"
         """, "35.89.28.100", ssh_file, user)
-        wait_and_download_results(master, ssh_file, experiment_id, user)
+        wait_and_download_results(master, ssh_file, experiment_id, user, o)
 
 
 

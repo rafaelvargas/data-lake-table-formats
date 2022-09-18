@@ -1,6 +1,7 @@
 
 from datetime import datetime
 import time
+from unittest import result
 
 from pyspark.sql import SparkSession
 from pyspark import SparkConf
@@ -29,6 +30,7 @@ class Experiment:
                 ('spark.sql.execution.pyarrow.enabled', 'true')
             ]
         self._spark_session = self._create_spark_session()
+        self._scale_in_gb = scale_in_gb
         self._database_name = f"{scale_in_gb}gb_{self._table_format}" 
         if not experiment_id:
             now = datetime.now()
@@ -72,8 +74,7 @@ class Experiment:
                 TBLPROPERTIES (
                     'write.format.default' = 'parquet',
                     'write.parquet.compression-codec' = 'snappy',
-                    'write.merge.mode' = 'copy-on-write',
-                    'write.spark.fanout.enabled'= true
+                    'write.merge.mode' = 'copy-on-write'
                 )
             """,
             "delta": ""
@@ -86,13 +87,13 @@ class Experiment:
             { partition_string }
             { options_string[self._table_format] }
             LOCATION '{target_location}'
-            SELECT * FROM `parquet`.`{self._path}/datasets/load_{table}.snappy.parquet`;
+            SELECT * FROM `parquet`.`{self._path}/datasets/{self._scale_in_gb}gb/load_{table}`;
         """, f"create-table-{table}")
 
     def _update_data(self, table: str = 'fact_daily_usage_by_user', percentage_to_update: int = 8):
         self._run_sql(f"""
             MERGE INTO `{self._database_name}`.`{table}` t
-            USING (SELECT * FROM parquet.`{self._path}/datasets/update_{percentage_to_update}_{table}.snappy.parquet`) s
+            USING (SELECT * FROM parquet.`{self._path}/datasets/{self._scale_in_gb}gb/update_{percentage_to_update}_{table}`) s
                 ON t.date = s.date
                 AND t.user_id = s.user_id
                 AND t.plan_id = s.plan_id
@@ -111,6 +112,8 @@ class Experiment:
         df = self._spark_session.sql(sql)
         _ = df.collect()
         end = time.time()
+        if ENV == 'dev':
+            df.show()
         self._execution_times.append([operation, end - start])
         print(f"Execution time: {end - start} ({operation})")
     
@@ -124,7 +127,8 @@ class Experiment:
                 COUNT(*) number_of_rows 
             FROM `{self._database_name}`.`{table}`
             GROUP BY 
-                date;
+                date
+            ORDER BY date ASC;
         """, f"q1")
         self._run_sql(f"""
             SELECT 
@@ -145,8 +149,8 @@ class Experiment:
         for table_name in tables.DEFINITIONS.keys():
             self._load_data(table=table_name)
     
-    def _dump_results_to_csv(self):
-        with open(f"{self._experiment_id}_results.csv", "w") as results_file:
+    def _dump_results_to_csv(self, operation: str):
+        with open(f"{self._experiment_id}_{operation}_results.csv", "w") as results_file:
             writer = csv.writer(results_file)
             writer.writerow(CSV_HEADER)
             writer.writerows(self._execution_times)
@@ -158,7 +162,7 @@ class Experiment:
             "query": self._query_data
         }
         operation_handlers[operation]()
-        self._dump_results_to_csv()
+        self._dump_results_to_csv(operation=operation)
 
 class IcebergExperiment(Experiment):
     def __init__(

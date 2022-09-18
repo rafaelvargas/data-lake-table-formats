@@ -3,6 +3,8 @@ spark
 *.log
 metastore_db
 scripts/data_generation/data
+*.csv
+*.out
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
