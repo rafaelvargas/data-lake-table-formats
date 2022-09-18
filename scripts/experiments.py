@@ -90,21 +90,22 @@ class Experiment:
             SELECT * FROM `parquet`.`{self._path}/datasets/{self._scale_in_gb}gb/load_{table}`;
         """, f"create-table-{table}")
 
-    def _update_data(self, table: str = 'fact_daily_usage_by_user', percentage_to_update: int = 8):
-        self._run_sql(f"""
-            MERGE INTO `{self._database_name}`.`{table}` t
-            USING (SELECT * FROM parquet.`{self._path}/datasets/{self._scale_in_gb}gb/update_{percentage_to_update}_{table}`) s
-                ON t.date = s.date
-                AND t.user_id = s.user_id
-                AND t.plan_id = s.plan_id
-                AND t.software_version_id = s.software_version_id
-                AND t.country_id = s.country_id
-                AND t.platform_id = s.platform_id
-            WHEN MATCHED THEN UPDATE SET 
-                t.duration_in_seconds = s.duration_in_seconds,
-                t.number_of_logins = s.number_of_logins,
-                t.number_of_songs_played = s.number_of_songs_played;
-        """, f"update-table-{table}-{percentage_to_update}")
+    def _update_data(self, table: str = 'fact_daily_usage_by_user', percentages_to_update: list = [8]):
+        for pencentage_to_update in percentages_to_update:
+            self._run_sql(f"""
+                MERGE INTO `{self._database_name}`.`{table}` t
+                USING (SELECT * FROM parquet.`{self._path}/datasets/{self._scale_in_gb}gb/update_{pencentage_to_update}_{table}`) s
+                    ON t.date = s.date
+                    AND t.user_id = s.user_id
+                    AND t.plan_id = s.plan_id
+                    AND t.software_version_id = s.software_version_id
+                    AND t.country_id = s.country_id
+                    AND t.platform_id = s.platform_id
+                WHEN MATCHED THEN UPDATE SET
+                    t.duration_in_seconds = s.duration_in_seconds,
+                    t.number_of_logins = s.number_of_logins,
+                    t.number_of_songs_played = s.number_of_songs_played;
+            """, f"update-table-{table}-{pencentage_to_update}")
 
     def _run_sql(self, sql: str, operation: str):
         self._spark_session.sparkContext.setJobGroup(operation, operation, interruptOnCancel=True)
