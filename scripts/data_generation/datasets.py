@@ -1,13 +1,13 @@
 
-from faker import Faker
 import datetime
 import random
+
 import numpy as np
+from mimesis import Person
 
 RANDOM_SEED = 42
 
-fake = Faker()
-Faker.seed(RANDOM_SEED)
+person = Person(seed=RANDOM_SEED)
 
 random.seed(RANDOM_SEED)
 
@@ -16,12 +16,29 @@ END_DATE = datetime.date(2022, 8, 31)
 
 NUMBER_OF_COUNTRIES = 4
 NUMBER_OF_VERSIONS = 10
-NUMBER_OF_USERS = 10000
+
+SIZE = 2
+NUMBER_OF_RECORDS = int(15785056 * SIZE)
+
+
+def generate_daily_active_users():
+    number_of_days = (END_DATE - START_DATE).days + 1
+    daily_active_users = []
+    for i in range(number_of_days - 1):
+        base_active_users = int(NUMBER_OF_RECORDS / number_of_days)
+        daily_active_users.append(
+            base_active_users + random.randint(-int((base_active_users / 2) * 0.05), int((base_active_users / 2) * 0.05))
+        )
+    daily_active_users.append(NUMBER_OF_RECORDS - sum(daily_active_users))
+    return daily_active_users
+
+DAILY_ACTIVE_USERS = generate_daily_active_users()
+NUMBER_OF_USERS = max(DAILY_ACTIVE_USERS) * 4
+
 
 tables = {
     'fact_daily_usage_by_user': {
         'date': {
-            'generator': fake.date_between,
             'range': (START_DATE, END_DATE)
         },
         'user_id': {
@@ -75,10 +92,9 @@ tables = {
         'name': ['Brazil', 'United States', 'Germany', 'France']
     },
     'dim_user': {
-        'id': [i for i in range(1, NUMBER_OF_USERS + 1)],
-        'name': [fake.name() for _ in range(1, NUMBER_OF_USERS + 1)],
+        'id': np.arange(1, NUMBER_OF_USERS + 1),
+        'name': [person.full_name() for _ in range(0, NUMBER_OF_USERS)],
         'age': np.random.randint(14, 90, size=NUMBER_OF_USERS)
     }
 }
 
-# np.random.randint(14, 90, size=NUMBER_OF_USERS)
