@@ -46,7 +46,7 @@ def run_cmd(cmd, throw_on_error=True, env=None, stream_output=False, **kwargs):
 
 
 def run_cmd_over_ssh(cmd, host, ssh_id_file, user, **kwargs):
-    full_cmd = f"""ssh -i {ssh_id_file} {user}@{host} "{cmd}" """
+    full_cmd = f"""ssh -i {ssh_id_file} {user}@{host} '{cmd}'"""
     return run_cmd(full_cmd, **kwargs)
 
 def wait_and_download_results(master, ssh_id_file, experiment_id, ssh_user, operation):
@@ -61,11 +61,11 @@ def wait_and_download_results(master, ssh_id_file, experiment_id, ssh_user, oper
         if results_file in out.decode("utf-8"):
             completed = True
         else:
-            time.sleep(60)
+            time.sleep(30)
     
     run_cmd(f"rsync -zv {ssh_user}@{master}:~/{results_file} .")
     run_cmd(f"rsync -zv {ssh_user}@{master}:~/{out_file} .")
-    print("Downloaded results file")
+    print("Downloaded results file.")
 
 
 def parse_command_line_arguments():
@@ -116,18 +116,17 @@ if __name__ == "__main__":
 
     run_cmd(f"rsync -zv run_experiment.py tables.py experiments.py {user}@{master}:~")
     for o in args.operation.split(","):
-        run_cmd_over_ssh(f"""
-            screen -d -m \\ 
-            bash -c \\ 
-            "spark-submit
-                --packages {PACKAGES[table_format]}
-                --py-files experiments.py,tables.py run_experiment.py 
-                --table-format {args.table_format} --operation {o} 
-                --s3-path {args.s3_path} 
-                --scale-in-gb {args.scale_in_gb} 
-                --experiment-id {experiment_id}
-            &> {experiment_id}_{o}.out"
-        """, "35.89.28.100", ssh_file, user)
+        run_cmd_over_ssh((
+            "screen -d -m bash -c "
+            "\"spark-submit "
+                f"--packages {PACKAGES[table_format]} "
+                f"--py-files experiments.py,tables.py run_experiment.py "
+                f"--table-format {args.table_format} --operation {o} "
+                f"--s3-path {args.s3_path} "
+                f"--scale-in-gb {args.scale_in_gb} "
+                f"--experiment-id {experiment_id} "
+            f"&> {experiment_id}_{o}.out\""
+        ), master, ssh_file, user)
         wait_and_download_results(master, ssh_file, experiment_id, user, o)
 
 
