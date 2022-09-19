@@ -1,7 +1,7 @@
 resource "aws_db_instance" "metastore_service" {
   engine                 = "mysql"
   engine_version         = "8.0.28"
-  instance_class         = "db.t3.small"
+  instance_class         = "db.t3.medium"
   db_name                = "hive"
   username               = var.mysql_user
   password               = var.mysql_password
@@ -36,17 +36,26 @@ resource "aws_emr_cluster" "benchmarks" {
     emr_managed_master_security_group = aws_security_group.emr.id
     emr_managed_slave_security_group  = aws_security_group.emr.id
   }
+  
+  # master_instance_group {
+  #   instance_type = "m4.large"
+  # }
+  # core_instance_group {
+  #   instance_type  = "c4.large"
+  #   instance_count = var.emr_workers
+  #   ebs_config {
+  #     size                 = "40"
+  #     type                 = "gp2"
+  #     volumes_per_instance = 1
+  #   }
+  # }
+
   master_instance_group {
-    instance_type = "m4.large"
+    instance_type = "i3.xlarge"
   }
   core_instance_group {
-    instance_type  = "c4.large"
+    instance_type  = "i3.xlarge"
     instance_count = var.emr_workers
-    ebs_config {
-      size                 = "40"
-      type                 = "gp2"
-      volumes_per_instance = 1
-    }
   }
 
   configurations_json = <<EOF
