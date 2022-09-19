@@ -90,7 +90,7 @@ class Experiment:
             SELECT * FROM `parquet`.`{self._path}/datasets/{self._scale_in_gb}gb/load_{table}`;
         """, f"create-table-{table}")
 
-    def _update_data(self, table: str = 'fact_daily_usage_by_user', percentages_to_update: list = [8]):
+    def _update_data(self, table: str = 'fact_daily_usage_by_user', percentages_to_update: list = [8, 16, 32]):
         for pencentage_to_update in percentages_to_update:
             self._run_sql(f"""
                 MERGE INTO `{self._database_name}`.`{table}` t
@@ -122,10 +122,7 @@ class Experiment:
         self._run_sql(f"""
             SELECT 
                 date, 
-                COUNT(DISTINCT user_id) daily_active_users, 
-                SUM(duration_in_seconds) duration_sum, 
-                SUM(number_of_sessions) number_of_sessions,
-                COUNT(*) number_of_rows 
+                COUNT(DISTINCT user_id) number_of_active_users
             FROM `{self._database_name}`.`{table}`
             GROUP BY 
                 date
@@ -133,16 +130,79 @@ class Experiment:
         """, f"q1")
         self._run_sql(f"""
             SELECT 
+                COUNT(DISTINCT user_id) number_of_active_users
+            FROM `{self._database_name}`.`{table}`;
+        """, f"q2")
+        self._run_sql(f"""
+            SELECT 
+                plan_name, 
+                AVG(number_of_active_users)
+            FROM (
+                SELECT 
+                    date, 
+                    p.name plan_name,
+                    COUNT(DISTINCT user_id) number_of_active_users
+                FROM `{self._database_name}`.`{table}` f
+                INNER JOIN `{self._database_name}`.`dim_plan` p
+                    ON f.plan_id = p.id
+                GROUP BY 
+                    date,
+                    p.name
+            ) t
+            GROUP BY
+                plan_name
+        """, f"q3")
+        self._run_sql(f"""
+            SELECT 
+                v.version version, 
+                SUM(number_of_sessions) number_of_sessions
+            FROM `{self._database_name}`.`{table}` f
+            INNER JOIN `{self._database_name}`.`dim_software_version` v
+                on v.id = f.software_version_id
+            GROUP BY 
+                v.version
+            ORDER BY number_of_sessions DESC
+            LIMIT 1;
+        """, f"q4")
+        self._run_sql(f"""
+            SELECT 
                 c.name country, 
                 COUNT(DISTINCT user_id) number_of_active_users
-            FROM `{self._database_name}`.`{table}` t
+            FROM `{self._database_name}`.`{table}` f
             INNER JOIN `{self._database_name}`.`dim_country` c
-                on c.id = t.country_id
+                on c.id = f.country_id
             GROUP BY 
                 c.name
             ORDER BY number_of_active_users DESC
-            LIMIT 1;
-        """, f"q2")
+            LIMIT 5;
+        """, f"q5")
+        self._run_sql(f"""
+            WITH usage_ranking AS (
+                SELECT 
+                    plan.name plan,
+                    platform.name platform,
+                    ROW_NUMBER() OVER (PARTITION BY plan_id ORDER BY number_of_active_users DESC) rn
+                FROM (
+                    SELECT 
+                        plan_id,
+                        platform_id,
+                        COUNT(DISTINCT user_id) number_of_active_users 
+                    FROM `{self._database_name}`.`{table}` f
+                    GROUP BY
+                        f.plan_id,
+                        f.platform_id
+                ) t
+                INNER JOIN `{self._database_name}`.`dim_plan` plan
+                    ON plan.id = t.plan_id
+                INNER JOIN `{self._database_name}`.`dim_platform` platform
+                    ON platform.id = t.platform_id
+            )
+            SELECT
+                plan,
+                platform
+            FROM usage_ranking
+            WHERE rn = 1;
+        """, f"q6")
 
     def _load_tables(self):
         self._run_sql(f"DROP DATABASE IF EXISTS {self._database_name} CASCADE;", f"drop-database-{self._database_name}")
