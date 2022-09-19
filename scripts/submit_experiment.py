@@ -55,7 +55,7 @@ def wait_and_download_results(master, ssh_id_file, experiment_id, ssh_user, oper
     results_file = f"{experiment_id}_{operation}_results.csv"
     out_file = f"{experiment_id}_{operation}.out"
     while not completed:
-        print(f"Waiting for completion of the experiment id {experiment_id}...")
+        print(f"Waiting for completion of the experiment id {experiment_id}_{operation}...")
         (_, out, _) = run_cmd_over_ssh(f"ls {results_file}", master, ssh_id_file, ssh_user,
                                         throw_on_error=False)
         if results_file in out.decode("utf-8"):
@@ -107,27 +107,30 @@ if __name__ == "__main__":
     
     now = datetime.now()
     table_format = args.table_format
-    database_name = f"{args.scale_in_gb}gb_{table_format}" 
-    experiment_id = now.strftime("%Y%m%d_%H%M%S") + "_" + database_name
 
     ssh_file = "~/.ssh/id_ed25519"
     master = args.master
     user = args.user
+    scale_in_gb = args.scale_in_gb
 
     run_cmd(f"rsync -zv run_experiment.py tables.py experiments.py {user}@{master}:~")
-    for o in args.operation.split(","):
-        run_cmd_over_ssh((
-            "screen -d -m bash -c "
-            "\"spark-submit "
-                f"--packages {PACKAGES[table_format]} "
-                f"--py-files experiments.py,tables.py run_experiment.py "
-                f"--table-format {args.table_format} --operation {o} "
-                f"--s3-path {args.s3_path} "
-                f"--scale-in-gb {args.scale_in_gb} "
-                f"--experiment-id {experiment_id} "
-            f"&> {experiment_id}_{o}.out\""
-        ), master, ssh_file, user)
-        wait_and_download_results(master, ssh_file, experiment_id, user, o)
+    for s in scale_in_gb.split(","):
+        database_name = f"{s}gb_{table_format}" 
+        experiment_id = now.strftime("%Y%m%d_%H%M%S") + "_" + database_name
+        for o in args.operation.split(","):
+            print(f"Running operation {o}-{s}gb")
+            run_cmd_over_ssh((
+                "screen -d -m bash -c "
+                "\"spark-submit "
+                    f"--packages {PACKAGES[table_format]} "
+                    f"--py-files experiments.py,tables.py run_experiment.py "
+                    f"--table-format {args.table_format} --operation {o} "
+                    f"--s3-path {args.s3_path} "
+                    f"--scale-in-gb {s} "
+                    f"--experiment-id {experiment_id} "
+                f"&> {experiment_id}_{o}.out\""
+            ), master, ssh_file, user)
+            wait_and_download_results(master, ssh_file, experiment_id, user, o)
 
 
 
