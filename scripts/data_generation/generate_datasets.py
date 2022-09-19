@@ -42,7 +42,7 @@ def generate_update_datasets(table='fact_daily_usage_by_user', fractions_to_gene
             data = pd.read_parquet(f'{destination_folder}/load_{table}/date={date}')
             data.insert(0, 'date', date)
             sampled_data = data.sample(frac=fraction)
-            for column in ['duration_in_seconds', 'number_of_logins', 'number_of_songs_played']:
+            for column in ['duration_in_seconds', 'number_of_sessions', 'number_of_songs_played']:
                 sampled_data[column] = np.random.randint(datasets.tables[table][column]['range'][0], datasets.tables[table][column]['range'][1], size=len(sampled_data))
             sampled_data.to_parquet(f'{destination_folder}/update_{int(fraction * 100)}_{table}', compression='snappy', index=False, partition_cols=['date'])
 

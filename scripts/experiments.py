@@ -103,7 +103,7 @@ class Experiment:
                     AND t.platform_id = s.platform_id
                 WHEN MATCHED THEN UPDATE SET
                     t.duration_in_seconds = s.duration_in_seconds,
-                    t.number_of_logins = s.number_of_logins,
+                    t.number_of_sessions = s.number_of_sessions,
                     t.number_of_songs_played = s.number_of_songs_played;
             """, f"update-table-{table}-{pencentage_to_update}")
 
@@ -124,7 +124,7 @@ class Experiment:
                 date, 
                 COUNT(DISTINCT user_id) daily_active_users, 
                 SUM(duration_in_seconds) duration_sum, 
-                SUM(number_of_logins) number_of_logins,
+                SUM(number_of_sessions) number_of_sessions,
                 COUNT(*) number_of_rows 
             FROM `{self._database_name}`.`{table}`
             GROUP BY 

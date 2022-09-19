@@ -13,7 +13,7 @@ DEFINITIONS = {
             'platform_id': 'INT,',
             'country_id': 'INT,',
             'duration_in_seconds': 'INT,',
-            'number_of_logins': 'INT,',
+            'number_of_sessions': 'INT,',
             'number_of_songs_played': 'INT'
         }
     },

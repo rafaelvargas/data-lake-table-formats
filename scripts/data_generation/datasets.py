@@ -14,10 +14,10 @@ random.seed(RANDOM_SEED)
 START_DATE = datetime.date(2022, 8, 1)
 END_DATE = datetime.date(2022, 8, 31)
 
-NUMBER_OF_COUNTRIES = 4
+NUMBER_OF_COUNTRIES = 12
 NUMBER_OF_VERSIONS = 10
 
-SIZE = 2
+SIZE = 1
 NUMBER_OF_RECORDS = int(15785056 * SIZE)
 
 
@@ -43,31 +43,31 @@ tables = {
         },
         'user_id': {
             'generator': random.randint,
-            'range': (1, 100000)
+            'range': (1, NUMBER_OF_USERS)
         },
         'plan_id': {
             'generator': random.randint,
-            'range': (1, 10)
+            'range': (1, 4)
         },
         'software_version_id': {
             'generator': random.randint,
-            'range': (1, 10)
+            'range': (1, NUMBER_OF_VERSIONS)
         },
         'platform_id': {
             'generator': random.randint,
-            'range': (1, 10)
+            'range': (1, 3)
         },
         'country_id': {
             'generator': random.randint,
-            'range': (1, 100)
+            'range': (1, NUMBER_OF_COUNTRIES)
         },
         'duration_in_seconds': {
             'generator': random.randint,
             'range': (1, 86400)
         },
-        'number_of_logins': {
+        'number_of_sessions': {
             'generator': random.randint,
-            'range': (1, 40)
+            'range': (1, 5)
         },
         'number_of_songs_played': {
             'generator': random.randint,
@@ -84,17 +84,17 @@ tables = {
         'name': ['desktop', 'mobile', 'web']
     },
     'dim_software_version': {
-        'id': [i for i in range(1, 11)],
+        'id': [i for i in range(1, NUMBER_OF_VERSIONS + 1)],
         'version': [f"1.{i}" for i in range(1, NUMBER_OF_VERSIONS + 1)]
     },
     'dim_country': {
         'id': [i for i in range(1, NUMBER_OF_COUNTRIES + 1)],
-        'name': ['Brazil', 'United States', 'Germany', 'France']
+        'name': ['Brazil', 'United States', 'Germany', 'France', 'China', 'India', 'Russia', 'Mexico', 'Japan', 'Argentina', 'Canada', 'United Kingdom']
     },
     'dim_user': {
         'id': np.arange(1, NUMBER_OF_USERS + 1),
         'name': [person.full_name() for _ in range(0, NUMBER_OF_USERS)],
-        'age': np.random.randint(14, 90, size=NUMBER_OF_USERS)
+        'age': np.random.randint(10, 90, size=NUMBER_OF_USERS)
     }
 }
 
