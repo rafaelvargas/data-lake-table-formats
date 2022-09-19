@@ -23,7 +23,7 @@ def generate_load_dataset(table='fact_daily_usage_by_user', destination_folder='
                 elif column == "user_id":
                     df[column] = np.random.choice(datasets.tables['dim_user']['id'], size=number_of_active_users, replace=False)
                 else:
-                    df[column] = np.random.randint(column_definition['range'][0], column_definition['range'][1], number_of_active_users)
+                    df[column] = np.random.randint(column_definition['range'][0], column_definition['range'][1] + 1, number_of_active_users)
             df.to_parquet(f'{destination_folder}/load_{table}', compression='snappy', index=False, partition_cols=['date'], engine="pyarrow")
     else:
         df = pd.DataFrame.from_dict(datasets.tables[table])
@@ -43,7 +43,7 @@ def generate_update_datasets(table='fact_daily_usage_by_user', fractions_to_gene
             data.insert(0, 'date', date)
             sampled_data = data.sample(frac=fraction)
             for column in ['duration_in_seconds', 'number_of_sessions', 'number_of_songs_played']:
-                sampled_data[column] = np.random.randint(datasets.tables[table][column]['range'][0], datasets.tables[table][column]['range'][1], size=len(sampled_data))
+                sampled_data[column] = np.random.randint(datasets.tables[table][column]['range'][0], datasets.tables[table][column]['range'][1] + 1, size=len(sampled_data))
             sampled_data.to_parquet(f'{destination_folder}/update_{int(fraction * 100)}_{table}', compression='snappy', index=False, partition_cols=['date'])
 
 
