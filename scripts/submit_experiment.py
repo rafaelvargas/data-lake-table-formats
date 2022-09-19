@@ -114,23 +114,24 @@ if __name__ == "__main__":
     scale_in_gb = args.scale_in_gb
 
     run_cmd(f"rsync -zv run_experiment.py tables.py experiments.py {user}@{master}:~")
-    for s in scale_in_gb.split(","):
-        database_name = f"{s}gb_{table_format}" 
-        experiment_id = now.strftime("%Y%m%d_%H%M%S") + "_" + database_name
-        for o in args.operation.split(","):
-            print(f"Running operation {o}-{s}gb")
-            run_cmd_over_ssh((
-                "screen -d -m bash -c "
-                "\"spark-submit "
-                    f"--packages {PACKAGES[table_format]} "
-                    f"--py-files experiments.py,tables.py run_experiment.py "
-                    f"--table-format {args.table_format} --operation {o} "
-                    f"--s3-path {args.s3_path} "
-                    f"--scale-in-gb {s} "
-                    f"--experiment-id {experiment_id} "
-                f"&> {experiment_id}_{o}.out\""
-            ), master, ssh_file, user)
-            wait_and_download_results(master, ssh_file, experiment_id, user, o)
+    for tf in table_format.split(","):
+        for s in scale_in_gb.split(","):
+            database_name = f"{s}gb_{tf}" 
+            experiment_id = now.strftime("%Y%m%d_%H%M%S") + "_" + database_name
+            for o in args.operation.split(","):
+                print(f"Running {experiment_id}...")
+                run_cmd_over_ssh((
+                    "screen -d -m bash -c "
+                    "\"spark-submit "
+                        f"--packages {PACKAGES[tf]} "
+                        f"--py-files experiments.py,tables.py run_experiment.py "
+                        f"--table-format {tf} --operation {o} "
+                        f"--s3-path {args.s3_path} "
+                        f"--scale-in-gb {s} "
+                        f"--experiment-id {experiment_id} "
+                    f"&> {experiment_id}_{o}.out\""
+                ), master, ssh_file, user)
+                wait_and_download_results(master, ssh_file, experiment_id, user, o)
 
 
 
